@@ -1,0 +1,150 @@
+PINK MONEY - RESUMEN DE ARQUITECTURA
+=====================================
+App nativa iOS 26+ (iPhone y iPad) de finanzas para estudiantes.
+Hoy funciona 100% local. Firebase esta construido pero apagado.
+
+
+1. TECNOLOGIAS
+--------------
+- Swift 5.9 + SwiftUI (interfaz)
+- SwiftData (base local: gastos y perfil)
+- Swift Charts (dona y barras)
+- UserNotifications (aviso "El Cerdo avisa del limite" al 90% y 100%)
+- Network / NWPathMonitor (deteccion de internet)
+- Keychain + CryptoKit SHA256 (sesion y contrasenas locales)
+- Firebase Auth y Firestore por REST con URLSession (apagado)
+- Sin dependencias de terceros
+
+
+2. ARQUITECTURA
+---------------
+Patron: MVVM + Repository.
+
+  Vistas (SwiftUI)
+     |
+  ViewModels: LedgerStore, ExpenseViewModel, DashboardViewModel
+     |
+  Ledger = unica fuente de verdad de los numeros
+     |
+  Repositorios (SwiftData) --> Base local
+
+Piezas clave:
+- Ledger: calcula gastado del mes, hoy, disponible, % y limite (>= 90%),
+  agrupacion por dia, categorias e historico mes/anio.
+- LedgerStore: recalcula el Ledger al instante tras cada alta, baja o
+  cambio de presupuesto (por eso el contador se actualiza al guardar).
+- AuthService: sesion local, perfil y presupuesto.
+- SyncManager: cola con Firestore (isSynced). Apagada.
+- NotificationService: avisos de limite, 1 vez por nivel y por mes.
+
+Banderas (PinkTheme):
+- requiresLogin = false      -> abre directo al menu, sin login
+- cloudSyncEnabled = false   -> todo local, sin Firebase
+- defaultBudget = 8,000
+
+
+3. FLUJO
+--------
+Arranque:  Splash -> sesion local -> Menu principal
+
+Guardar gasto:
+  "+" -> escribir monto (comas en vivo) -> Guardar
+  -> se guarda en SwiftData -> se recalcula el contador
+  -> aviso de limite si aplica -> regresa a Inicio (arriba) -> cierra modal
+
+Borrar gasto:
+  Deslizar la fila a la izquierda y soltar = se borra directo
+  (necesita pasar 40% del ancho de la fila, o deslizar rapido).
+  Si se suelta antes, la fila regresa.
+
+Historico (Radiografia):
+  Selector Mes / Anio + flechas para moverse de periodo.
+  Muestra total, movimientos, promedio, dona, mayor fuga y desglose.
+  En Anio: barras por mes y lista mes por mes (tocar un mes lo abre).
+
+Navegacion (barra inferior flotante):
+  Inicio | Movimientos | [ + ] | Radiografia | Perfil
+
+
+4. PANTALLAS
+------------
+- Splash ............. entrada animada con el Cerdo
+- Inicio ............. saludo, presupuesto, alertas, ultimos movimientos
+- Movimientos ........ historial por dia con filtro por categoria
+- Radiografia ........ historico por mes y anio, dona, barras
+- Perfil ............. nombre, escuela, correo, presupuesto, cerrar sesion
+- Nuevo gasto ........ modal con monto, categoria y nota
+
+
+5. COLORES (tema oscuro, siempre activo)
+----------------------------------------
+Fondo ................ #0B0608  (negro con tinte rosa)
+Tarjetas ............. #1B1116
+Campos y chips ....... #2A1920
+Bordes ............... #3F2630
+Texto principal ...... #FFF8F9
+Texto secundario ..... #EFD5DC
+Texto tenue .......... #C4A8B0
+Tarjeta destacada .... #5A1D33  (vino)
+Acento / boton ....... #F2A7BA  (rosa brillante)
+Texto sobre boton .... #1E0A12
+Rosa de marca ........ #D8A7A0
+Verde de apoyo ....... #9AB2A0 / #A6BEA7
+Peligro .............. #FF6A60
+Advertencia .......... #E0B068
+Exito ................ #7DBE92
+Resplandores de fondo: rosa #F2A7BA (30%) y vino #8E2A55 (55%)
+
+Categorias:
+  Renta #9C4A5A | Servicios #C9964A | Despensa #6F9477
+  Transporte #5B7C99 | Facultad #8A7BA8 | Ocio #D8A7A0
+
+Tipografia: SF Rounded bold. Monto grande 44 pt.
+Radios: tarjeta 26, fila 20, control 18, chip 14. Margen de pantalla 20.
+Dinero: es_MX, comas en millares ($8,000.00). Limite $1,000,000.
+
+
+6. COMPONENTES
+--------------
+- Estructura: PinkScreen, PinkScrollView, PinkCard
+- Navegacion: PinkTabBar (boton "+" de 48 pt)
+- Botones: PrimaryDarkButton, PinkSoftButton, PinkPillButton
+- Gastos: MovementRow, SwipeToDelete, CategoryBadge, CategoryFilterBar
+- Presupuesto: HeroBalanceCard, BudgetMeter, PinkProgressBar
+- Graficas: CategoryDonutCard, TopLeakCard, CategoryBreakdownRow,
+            PeriodNavigator, PeriodSummaryCard, MonthlyBarsCard,
+            MonthSummaryRow
+- Formularios: PinkField, groupedMoney (comas en vivo)
+- Estados: StatusChip, PinkBadge, PinkAlertBanner, EmptyStateView
+- Marca: CerdoMascot (cerdo con lentes dibujado en SwiftUI)
+
+
+7. DATOS
+--------
+- Base SwiftData "PinkMoney" en el iPhone (sin iCloud).
+- Modelos: Expense (monto, categoria, fecha, nota, isSynced)
+           UserProfile (correo, presupuesto, nombre, escuela)
+- Si la base no abre, se aparta como respaldo; nunca se borra.
+- Nube (apagada): users/{uid} y users/{uid}/expenses/{id},
+  con reglas para que cada usuario solo vea lo suyo.
+
+
+8. ESTRUCTURA DE CARPETAS
+-------------------------
+Models/       Expense, UserProfile, ExpenseCategory
+Persistence/  LocalDatabase, repositorios
+Services/     Auth, Sync, Notificaciones, Red, Firebase, Keychain
+ViewModels/   Ledger, LedgerStore, Dashboard, Expense
+Views/        pantallas
+Design/       paleta, tokens, formato de dinero, componentes
+
+
+9. VERIFICACION Y PENDIENTES
+----------------------------
+Probado con pruebas de logica sobre base real: guardar, contador, borrar,
+persistencia al reabrir, historico mes/anio, formato de dinero, regla de
+deslizar. No se pudo probar en simulador: falta revisar gestos y aspecto
+en el dispositivo.
+
+Pendiente: crear backend Firebase (API_KEY, PROJECT_ID), activar
+cloudSyncEnabled, probar en dispositivo.

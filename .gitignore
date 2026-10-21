@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager / Xcode / Swift Playgrounds
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Secretos de Firebase (no subir llaves reales)
+GoogleService-Info.plist
+*.respaldo-*
